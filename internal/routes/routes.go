@@ -14,16 +14,9 @@ func Register(app *fiber.App, serviceName string) {
 
 	cfg := config.Load(serviceName, "7004")
 
-	// Try to initialize repository, but don't panic if it fails
 	repo, err := repositories.NewTransactionRepository(cfg.PostgresDSN)
 	if err != nil {
-		// Log error but continue with empty handler
-		println("Warning: Failed to connect to database:", err.Error())
-		// Return empty array for now
-		app.Get("/transactions", func(c *fiber.Ctx) error {
-			return c.JSON([]interface{}{})
-		})
-		return
+		panic(err)
 	}
 
 	svc := services.NewTransactionService(repo)

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	// _ "github.com/lib/pq"
+	_ "github.com/lib/pq"
 
 	"github.com/kodra-pay/transaction-service/internal/models"
 )
