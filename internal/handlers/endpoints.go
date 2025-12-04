@@ -20,17 +20,42 @@ func (h *TransactionHandler) Create(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
 	}
-	return c.JSON(h.svc.Create(c.Context(), req))
+	if req.MerchantID == "" || req.Amount <= 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "merchant_id and positive amount are required")
+	}
+
+	resp, err := h.svc.Create(c.Context(), req)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to create transaction")
+	}
+	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 func (h *TransactionHandler) Get(c *fiber.Ctx) error {
 	ref := c.Params("reference")
-	return c.JSON(h.svc.Get(c.Context(), ref))
+	if ref == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "reference is required")
+	}
+	resp, err := h.svc.Get(c.Context(), ref)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to fetch transaction")
+	}
+	if resp.Reference == "" {
+		return fiber.NewError(fiber.StatusNotFound, "transaction not found")
+	}
+	return c.JSON(resp)
 }
 
 func (h *TransactionHandler) List(c *fiber.Ctx) error {
 	merchantID := c.Query("merchant_id")
-	return c.JSON(h.svc.ListByMerchant(c.Context(), merchantID, 50))
+	if merchantID == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "merchant_id is required")
+	}
+	resp, err := h.svc.ListByMerchant(c.Context(), merchantID, 50)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to list transactions")
+	}
+	return c.JSON(resp)
 }
 
 func (h *TransactionHandler) Capture(c *fiber.Ctx) error {
