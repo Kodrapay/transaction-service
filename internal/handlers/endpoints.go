@@ -28,6 +28,11 @@ func (h *TransactionHandler) Get(c *fiber.Ctx) error {
 	return c.JSON(h.svc.Get(c.Context(), ref))
 }
 
+func (h *TransactionHandler) List(c *fiber.Ctx) error {
+	merchantID := c.Query("merchant_id")
+	return c.JSON(h.svc.ListByMerchant(c.Context(), merchantID, 50))
+}
+
 func (h *TransactionHandler) Capture(c *fiber.Ctx) error {
 	ref := c.Params("reference")
 	return c.JSON(h.svc.Capture(c.Context(), ref))
