@@ -7,6 +7,7 @@ type Transaction struct {
 	Reference    string    `json:"reference"`
 	MerchantID   string    `json:"merchant_id"`
 	CustomerEmail string   `json:"customer_email,omitempty"`
+	CustomerID   string    `json:"customer_id,omitempty"` // Added CustomerID
 	CustomerName string    `json:"customer_name,omitempty"`
 	Amount       int64     `json:"amount"`
 	Currency     string    `json:"currency"`

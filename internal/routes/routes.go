@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/kodra-pay/transaction-service/internal/handlers"
 	"github.com/kodra-pay/transaction-service/internal/config"
+	"github.com/kodra-pay/transaction-service/internal/queue"
 	"github.com/kodra-pay/transaction-service/internal/repositories"
 	"github.com/kodra-pay/transaction-service/internal/services"
 )
@@ -19,7 +20,10 @@ func Register(app *fiber.App, serviceName string) {
 		panic(err)
 	}
 
-	svc := services.NewTransactionService(repo)
+	// Initialize settlement event publisher
+	publisher := queue.NewSettlementPublisher()
+
+	svc := services.NewTransactionService(repo, publisher)
 	handler := handlers.NewTransactionHandler(svc)
 
 	app.Get("/transactions", handler.List)
