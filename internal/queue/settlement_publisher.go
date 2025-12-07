@@ -48,27 +48,30 @@ func NewSettlementPublisher() *SettlementPublisher {
 }
 
 // PublishTransaction publishes a transaction event for settlement processing
-func (p *SettlementPublisher) PublishTransaction(ctx context.Context, merchantID string, amount int64, currency string, txID string) error {
+func (p *SettlementPublisher) PublishTransaction(ctx context.Context, merchantID int, amount int64, currency string, txID int) error {
 	if p.client == nil {
 		return fmt.Errorf("redis client not initialized")
 	}
 
+	merchantKey := strconv.Itoa(merchantID)
+	txKeyValue := strconv.Itoa(txID)
+
 	// Add merchant to pending set (merchants that need settlement check)
-	if err := p.client.SAdd(ctx, "settlements:merchants:pending", merchantID).Err(); err != nil {
-		log.Printf("Failed to add merchant %s to pending set: %v", merchantID, err)
+	if err := p.client.SAdd(ctx, "settlements:merchants:pending", merchantKey).Err(); err != nil {
+		log.Printf("Failed to add merchant %s to pending set: %v", merchantKey, err)
 		return err
 	}
 
 	// Increment merchant's unsettled amount
-	key := "settlements:amounts:" + merchantID
+	key := "settlements:amounts:" + merchantKey
 	if err := p.client.IncrBy(ctx, key, amount).Err(); err != nil {
-		log.Printf("Failed to increment amount for merchant %s: %v", merchantID, err)
+		log.Printf("Failed to increment amount for merchant %s: %v", merchantKey, err)
 		return err
 	}
 
 	// Add to merchant's transaction set (for tracking which transactions are included)
-	txKey := "settlements:txns:" + merchantID
-	if err := p.client.SAdd(ctx, txKey, txID).Err(); err != nil {
+	txKey := "settlements:txns:" + merchantKey
+	if err := p.client.SAdd(ctx, txKey, txKeyValue).Err(); err != nil {
 		log.Printf("Failed to add transaction to merchant set: %v", err)
 		return err
 	}
@@ -78,7 +81,7 @@ func (p *SettlementPublisher) PublishTransaction(ctx context.Context, merchantID
 	p.client.Expire(ctx, txKey, 30*24*time.Hour)
 
 	log.Printf("Published settlement event: merchant=%s, amount=%d, currency=%s, tx=%s",
-		merchantID, amount, currency, txID)
+		merchantKey, amount, currency, txKeyValue)
 
 	return nil
 }

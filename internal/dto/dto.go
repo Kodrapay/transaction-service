@@ -4,10 +4,11 @@ import "time"
 
 // TransactionCreateRequest DTO for creating a new transaction
 type TransactionCreateRequest struct {
-	Reference     string `json:"reference,omitempty"`
-	MerchantID    string `json:"merchant_id"`
+	Reference     int `json:"reference,omitempty"`
+	MerchantID    int `json:"merchant_id"`
 	CustomerEmail string `json:"customer_email,omitempty"`
-	CustomerID    string `json:"customer_id"` // Added CustomerID
+	CustomerID    int `json:"customer_id"`
+	CustomerName  string `json:"customer_name,omitempty"`
 	Amount        int64  `json:"amount"`
 	Currency      string `json:"currency"`
 	PaymentMethod string `json:"payment_method,omitempty"`
@@ -17,11 +18,11 @@ type TransactionCreateRequest struct {
 
 // TransactionResponse DTO for returning transaction information
 type TransactionResponse struct {
-	ID            string    `json:"id"`
-	Reference     string    `json:"reference"`
-	MerchantID    string    `json:"merchant_id"`
+	ID            int       `json:"id"`
+	Reference     int       `json:"reference"`
+	MerchantID    int       `json:"merchant_id"`
 	CustomerEmail string    `json:"customer_email"`
-	CustomerID    string    `json:"customer_id"` // Added CustomerID
+	CustomerID    int       `json:"customer_id"`
 	CustomerName  string    `json:"customer_name,omitempty"`
 	Amount        int64     `json:"amount"`
 	Currency      string    `json:"currency"`
