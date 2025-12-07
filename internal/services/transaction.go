@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
+	"io"
 
 	"github.com/kodra-pay/transaction-service/internal/dto"
 	"github.com/kodra-pay/transaction-service/internal/models"
@@ -70,7 +72,7 @@ func (s *TransactionService) Create(ctx context.Context, req dto.TransactionCrea
 			// tx.Reference is now string, need to convert tx.ID to string if settlementPublisher expects string reference
 			if err := s.settlementPublisher.PublishTransaction(publishCtx, tx.MerchantID, tx.Amount, tx.Currency, tx.ID); err != nil {
 				// Log error but don't fail the transaction
-				fmt.Printf("Failed to publish settlement event: %v\n", err)
+				log.Printf("Failed to publish settlement event: %v\n", err)
 			}
 		}()
 	}

@@ -58,22 +58,19 @@ func (p *SettlementPublisher) PublishTransaction(ctx context.Context, merchantID
 
 	// Add merchant to pending set (merchants that need settlement check)
 	if err := p.client.SAdd(ctx, "settlements:merchants:pending", merchantKey).Err(); err != nil {
-		log.Printf("Failed to add merchant %s to pending set: %v", merchantKey, err)
-		return err
+		return fmt.Errorf("failed to add merchant %s to pending set: %w", merchantKey, err)
 	}
 
 	// Increment merchant's unsettled amount
 	key := "settlements:amounts:" + merchantKey
 	if err := p.client.IncrBy(ctx, key, amount).Err(); err != nil {
-		log.Printf("Failed to increment amount for merchant %s: %v", merchantKey, err)
-		return err
+		return fmt.Errorf("failed to increment amount for merchant %s: %w", merchantKey, err)
 	}
 
 	// Add to merchant's transaction set (for tracking which transactions are included)
 	txKey := "settlements:txns:" + merchantKey
 	if err := p.client.SAdd(ctx, txKey, txKeyValue).Err(); err != nil {
-		log.Printf("Failed to add transaction to merchant set: %v", err)
-		return err
+		return fmt.Errorf("failed to add transaction to merchant set: %w", err)
 	}
 
 	// Set expiry on amount key (30 days) to prevent stale data
@@ -128,6 +125,9 @@ func (p *SettlementPublisher) ClearMerchantPending(ctx context.Context, merchant
 	pipe.Del(ctx, "settlements:txns:"+merchantID)
 
 	_, err := pipe.Exec(ctx)
+	if err != nil {
+		log.Printf("Failed to clear Redis data for merchant %s: %v", merchantID, err)
+	}
 	return err
 }
 
