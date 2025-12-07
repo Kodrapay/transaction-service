@@ -49,13 +49,24 @@ func (h *TransactionHandler) Get(c *fiber.Ctx) error {
 }
 
 func (h *TransactionHandler) List(c *fiber.Ctx) error {
-	merchantID := c.QueryInt("merchant_id", 0) // Use c.QueryInt
-	if merchantID == 0 {
-		return fiber.NewError(fiber.StatusBadRequest, "merchant_id is required")
+	limit := c.QueryInt("limit", 50) // Default limit to 50
+
+	status := c.Query("status")
+	if status != "" {
+		resp, err := h.svc.ListByStatus(c.Context(), status, limit)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "failed to list transactions by status")
+		}
+		return c.JSON(resp)
 	}
-	resp, err := h.svc.ListByMerchant(c.Context(), merchantID, 50)
+
+	merchantID := c.QueryInt("merchant_id", 0)
+	if merchantID == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "merchant_id is required unless filtering by status")
+	}
+	resp, err := h.svc.ListByMerchant(c.Context(), merchantID, limit)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "failed to list transactions")
+		return fiber.NewError(fiber.StatusInternalServerError, "failed to list transactions by merchant")
 	}
 	return c.JSON(resp)
 }

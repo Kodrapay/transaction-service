@@ -114,3 +114,32 @@ func (r *TransactionRepository) ListByMerchant(ctx context.Context, merchantID i
 	}
 	return list, rows.Err()
 }
+
+func (r *TransactionRepository) ListByStatus(ctx context.Context, status string, limit int) ([]*models.Transaction, error) {
+	query := `
+		SELECT id, reference, merchant_id, customer_email, customer_id, customer_name, amount, currency, status, payment_method, description, created_at, updated_at
+		FROM transactions
+		WHERE status = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+	rows, err := r.db.QueryContext(ctx, query, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*models.Transaction
+	for rows.Next() {
+		var tx models.Transaction
+		if err := rows.Scan(
+			&tx.ID, &tx.Reference, &tx.MerchantID, &tx.CustomerEmail, &tx.CustomerID, &tx.CustomerName,
+			&tx.Amount, &tx.Currency, &tx.Status, &tx.PaymentMethod, &tx.Description,
+			&tx.CreatedAt, &tx.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, &tx)
+	}
+	return list, rows.Err()
+}

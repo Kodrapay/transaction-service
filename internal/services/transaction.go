@@ -116,7 +116,17 @@ func (s *TransactionService) updateMerchantBalance(merchantID int, currency stri
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	_, _ = client.Do(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Warning: failed to call merchant service to update balance: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		fmt.Printf("Warning: merchant service returned non-ok status for balance update: %d, body: %s\n", resp.StatusCode, respBody)
+	}
 	// Ignore errors - balance update is not critical for transaction success
 }
 
@@ -163,6 +173,30 @@ func (s *TransactionService) ListByMerchant(ctx context.Context, merchantID int,
 		res.Transactions = append(res.Transactions, dto.TransactionResponse{
 			ID:            tx.ID,
 			Reference:     tx.Reference, // string
+			MerchantID:    tx.MerchantID,
+			CustomerEmail: tx.CustomerEmail,
+			CustomerID:    tx.CustomerID,
+			CustomerName:  tx.CustomerName,
+			Amount:        tx.Amount,
+			Currency:      tx.Currency,
+			Status:        tx.Status,
+			Description:   tx.Description,
+			CreatedAt:     tx.CreatedAt,
+		})
+	}
+	return res, nil
+}
+
+func (s *TransactionService) ListByStatus(ctx context.Context, status string, limit int) (dto.TransactionListResponse, error) {
+	list, err := s.repo.ListByStatus(ctx, status, limit)
+	if err != nil {
+		return dto.TransactionListResponse{}, err
+	}
+	res := dto.TransactionListResponse{}
+	for _, tx := range list {
+		res.Transactions = append(res.Transactions, dto.TransactionResponse{
+			ID:            tx.ID,
+			Reference:     tx.Reference,
 			MerchantID:    tx.MerchantID,
 			CustomerEmail: tx.CustomerEmail,
 			CustomerID:    tx.CustomerID,
