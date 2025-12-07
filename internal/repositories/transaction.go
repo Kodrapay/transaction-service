@@ -35,10 +35,34 @@ func (r *TransactionRepository) Create(ctx context.Context, tx *models.Transacti
 		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
 		RETURNING id, created_at, updated_at
 	`
-	return r.db.QueryRowContext(ctx, query,
+	if err := r.db.QueryRowContext(ctx, query,
 		tx.Reference, tx.MerchantID, tx.CustomerEmail, tx.CustomerName,
 		tx.Amount, tx.Currency, tx.Status, tx.PaymentMethod, tx.Description,
-	).Scan(&tx.ID, &tx.CreatedAt, &tx.UpdatedAt)
+	).Scan(&tx.ID, &tx.CreatedAt, &tx.UpdatedAt); err != nil {
+		return err
+	}
+
+	// Record ledger credit for this merchant to feed settlement calculations.
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO wallet_ledger (
+			id, merchant_id, transaction_id, entry_type, amount, balance_after,
+			currency, description, reference, created_at
+		)
+		VALUES (
+			uuid_generate_v4(),
+			$1,
+			$2,
+			'credit',
+			$3,
+			(SELECT COALESCE(MAX(balance_after), 0) + $3 FROM wallet_ledger WHERE merchant_id = $1),
+			$4,
+			$5,
+			$6,
+			NOW()
+		)
+	`, tx.MerchantID, tx.ID, tx.Amount, tx.Currency, "Transaction credit", "TXN_"+tx.Reference)
+
+	return err
 }
 
 func (r *TransactionRepository) GetByReference(ctx context.Context, reference string) (*models.Transaction, error) {
