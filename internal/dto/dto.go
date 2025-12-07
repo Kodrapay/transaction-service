@@ -4,7 +4,7 @@ import "time"
 
 // TransactionCreateRequest DTO for creating a new transaction
 type TransactionCreateRequest struct {
-	Reference     int `json:"reference,omitempty"`
+	Reference     string `json:"reference,omitempty"`
 	MerchantID    int `json:"merchant_id"`
 	CustomerEmail string `json:"customer_email,omitempty"`
 	CustomerID    int `json:"customer_id"`
@@ -19,7 +19,7 @@ type TransactionCreateRequest struct {
 // TransactionResponse DTO for returning transaction information
 type TransactionResponse struct {
 	ID            int       `json:"id"`
-	Reference     int       `json:"reference"`
+	Reference     string    `json:"reference"`
 	MerchantID    int       `json:"merchant_id"`
 	CustomerEmail string    `json:"customer_email"`
 	CustomerID    int       `json:"customer_id"`

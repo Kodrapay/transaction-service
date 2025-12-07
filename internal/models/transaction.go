@@ -4,7 +4,7 @@ import "time"
 
 type Transaction struct {
 	ID            int       `json:"id"`
-	Reference     int       `json:"reference"`
+	Reference     string    `json:"reference"` // Changed from int to string
 	MerchantID    int       `json:"merchant_id"`
 	CustomerEmail string    `json:"customer_email,omitempty"`
 	CustomerID    int       `json:"customer_id,omitempty"` // Added CustomerID

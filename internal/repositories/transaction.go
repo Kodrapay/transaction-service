@@ -33,12 +33,12 @@ func (r *TransactionRepository) Create(ctx context.Context, tx *models.Transacti
 	query := `
 		INSERT INTO transactions (reference, merchant_id, customer_email, customer_id, customer_name, amount, currency, status, payment_method, description, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
-		RETURNING id, created_at, updated_at
+		RETURNING id, reference, created_at, updated_at -- Also return reference
 	`
 	if err := r.db.QueryRowContext(ctx, query,
 		tx.Reference, tx.MerchantID, tx.CustomerEmail, tx.CustomerID, tx.CustomerName,
 		tx.Amount, tx.Currency, tx.Status, tx.PaymentMethod, tx.Description,
-	).Scan(&tx.ID, &tx.CreatedAt, &tx.UpdatedAt); err != nil {
+	).Scan(&tx.ID, &tx.Reference, &tx.CreatedAt, &tx.UpdatedAt); err != nil { // Scan into reference
 		return err
 	}
 
@@ -68,7 +68,7 @@ func (r *TransactionRepository) Create(ctx context.Context, tx *models.Transacti
 	return nil
 }
 
-func (r *TransactionRepository) GetByReference(ctx context.Context, reference int) (*models.Transaction, error) {
+func (r *TransactionRepository) GetByReference(ctx context.Context, reference string) (*models.Transaction, error) {
 	query := `
 		SELECT id, reference, merchant_id, customer_email, customer_id, customer_name, amount, currency, status, payment_method, description, created_at, updated_at
 		FROM transactions

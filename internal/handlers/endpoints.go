@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/kodra-pay/transaction-service/internal/dto"
@@ -18,7 +20,7 @@ func NewTransactionHandler(svc *services.TransactionService) *TransactionHandler
 func (h *TransactionHandler) Create(c *fiber.Ctx) error {
 	var req dto.TransactionCreateRequest
 	if err := c.BodyParser(&req); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "invalid request body")
+		return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 	}
 	if req.MerchantID == 0 || req.Amount <= 0 { // int check
 		return fiber.NewError(fiber.StatusBadRequest, "merchant_id and positive amount are required")
@@ -26,24 +28,21 @@ func (h *TransactionHandler) Create(c *fiber.Ctx) error {
 
 	resp, err := h.svc.Create(c.Context(), req)
 	if err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "failed to create transaction")
+		return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("failed to create transaction: %v", err))
 	}
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 func (h *TransactionHandler) Get(c *fiber.Ctx) error {
-	ref, err := c.ParamsInt("reference") // Use c.ParamsInt
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid reference ID")
-	}
-	if ref == 0 { // int check
+	ref := c.Params("reference") // Use c.Params
+	if ref == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "reference is required")
 	}
-	resp, err := h.svc.Get(c.Context(), ref) // int
+	resp, err := h.svc.Get(c.Context(), ref) // Pass string
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "failed to fetch transaction")
 	}
-	if resp.Reference == 0 { // int check
+	if resp.Reference == "" { // Check for empty string
 		return fiber.NewError(fiber.StatusNotFound, "transaction not found")
 	}
 	return c.JSON(resp)
@@ -54,7 +53,7 @@ func (h *TransactionHandler) List(c *fiber.Ctx) error {
 	if merchantID == 0 {
 		return fiber.NewError(fiber.StatusBadRequest, "merchant_id is required")
 	}
-	resp, err := h.svc.ListByMerchant(c.Context(), merchantID, 50) // int
+	resp, err := h.svc.ListByMerchant(c.Context(), merchantID, 50)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, "failed to list transactions")
 	}
@@ -62,17 +61,17 @@ func (h *TransactionHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *TransactionHandler) Capture(c *fiber.Ctx) error {
-	ref, err := c.ParamsInt("reference") // Use c.ParamsInt
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid reference ID")
+	ref := c.Params("reference") // Use c.Params
+	if ref == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "reference is required")
 	}
 	return c.JSON(h.svc.Capture(c.Context(), ref))
 }
 
 func (h *TransactionHandler) Refund(c *fiber.Ctx) error {
-	ref, err := c.ParamsInt("reference") // Use c.ParamsInt
-	if err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid reference ID")
+	ref := c.Params("reference") // Use c.Params
+	if ref == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "reference is required")
 	}
 	return c.JSON(h.svc.Refund(c.Context(), ref))
 }
