@@ -2,8 +2,8 @@ package routes
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/kodra-pay/transaction-service/internal/handlers"
 	"github.com/kodra-pay/transaction-service/internal/config"
+	"github.com/kodra-pay/transaction-service/internal/handlers"
 	"github.com/kodra-pay/transaction-service/internal/queue"
 	"github.com/kodra-pay/transaction-service/internal/repositories"
 	"github.com/kodra-pay/transaction-service/internal/services"

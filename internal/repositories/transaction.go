@@ -31,49 +31,54 @@ func NewTransactionRepository(dsn string) (*TransactionRepository, error) {
 
 func (r *TransactionRepository) Create(ctx context.Context, tx *models.Transaction) error {
 	query := `
-		INSERT INTO transactions (id, reference, merchant_id, customer_email, customer_name, amount, currency, status, payment_method, description, created_at, updated_at)
-		VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
-		RETURNING id, created_at, updated_at
+		INSERT INTO transactions (reference, merchant_id, customer_email, customer_id, customer_name, amount, currency, status, payment_method, description, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+		RETURNING id, reference, created_at, updated_at -- Also return reference
 	`
 	if err := r.db.QueryRowContext(ctx, query,
-		tx.Reference, tx.MerchantID, tx.CustomerEmail, tx.CustomerName,
+		tx.Reference, tx.MerchantID, tx.CustomerEmail, tx.CustomerID, tx.CustomerName,
 		tx.Amount, tx.Currency, tx.Status, tx.PaymentMethod, tx.Description,
-	).Scan(&tx.ID, &tx.CreatedAt, &tx.UpdatedAt); err != nil {
+	).Scan(&tx.ID, &tx.Reference, &tx.CreatedAt, &tx.UpdatedAt); err != nil { // Scan into reference
 		return err
 	}
 
-	// Record ledger credit for this merchant to feed settlement calculations.
-	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO wallet_ledger (
-			id, merchant_id, transaction_id, entry_type, amount, balance_after,
-			currency, description, reference, created_at
-		)
-		VALUES (
-			uuid_generate_v4(),
-			$1,
-			$2,
-			'credit',
-			$3,
-			(SELECT COALESCE(MAX(balance_after), 0) + $3 FROM wallet_ledger WHERE merchant_id = $1),
-			$4,
-			$5,
-			$6,
-			NOW()
-		)
-	`, tx.MerchantID, tx.ID, tx.Amount, tx.Currency, "Transaction credit", "TXN_"+tx.Reference)
+	// Record ledger credit for this merchant to feed settlement calculations, skip payout rows.
+	if tx.Status != "payout" && tx.PaymentMethod != "payout" {
+		_, err := r.db.ExecContext(ctx, `
+			INSERT INTO wallet_ledger (
+				merchant_id, transaction_id, entry_type, amount, balance_after,
+				currency, description, reference, created_at
+			)
+			VALUES (
+				$1,
+				$2,
+				'credit',
+				$3,
+				(SELECT COALESCE(MAX(balance_after), 0) + $3 FROM wallet_ledger WHERE merchant_id = $1),
+				$4,
+				$5,
+				$6,
+				NOW()
+			)
+		`, tx.MerchantID, tx.ID, tx.Amount, tx.Currency, "Transaction credit", tx.Reference)
+		if err != nil {
+			// Log the error but don't fail the transaction creation
+			fmt.Printf("failed to record ledger entry: %v\n", err)
+		}
+	}
 
-	return err
+	return nil
 }
 
 func (r *TransactionRepository) GetByReference(ctx context.Context, reference string) (*models.Transaction, error) {
 	query := `
-		SELECT id, reference, merchant_id, customer_email, customer_name, amount, currency, status, payment_method, description, created_at, updated_at
+		SELECT id, reference, merchant_id, customer_email, customer_id, customer_name, amount, currency, status, payment_method, description, created_at, updated_at
 		FROM transactions
 		WHERE reference = $1
 	`
 	var tx models.Transaction
 	err := r.db.QueryRowContext(ctx, query, reference).Scan(
-		&tx.ID, &tx.Reference, &tx.MerchantID, &tx.CustomerEmail, &tx.CustomerName,
+		&tx.ID, &tx.Reference, &tx.MerchantID, &tx.CustomerEmail, &tx.CustomerID, &tx.CustomerName,
 		&tx.Amount, &tx.Currency, &tx.Status, &tx.PaymentMethod, &tx.Description,
 		&tx.CreatedAt, &tx.UpdatedAt,
 	)
@@ -83,9 +88,9 @@ func (r *TransactionRepository) GetByReference(ctx context.Context, reference st
 	return &tx, err
 }
 
-func (r *TransactionRepository) ListByMerchant(ctx context.Context, merchantID string, limit int) ([]*models.Transaction, error) {
+func (r *TransactionRepository) ListByMerchant(ctx context.Context, merchantID int, limit int) ([]*models.Transaction, error) {
 	query := `
-		SELECT id, reference, merchant_id, customer_email, customer_name, amount, currency, status, payment_method, description, created_at, updated_at
+		SELECT id, reference, merchant_id, customer_email, customer_id, customer_name, amount, currency, status, payment_method, description, created_at, updated_at
 		FROM transactions
 		WHERE merchant_id = $1
 		ORDER BY created_at DESC
@@ -101,7 +106,36 @@ func (r *TransactionRepository) ListByMerchant(ctx context.Context, merchantID s
 	for rows.Next() {
 		var tx models.Transaction
 		if err := rows.Scan(
-			&tx.ID, &tx.Reference, &tx.MerchantID, &tx.CustomerEmail, &tx.CustomerName,
+			&tx.ID, &tx.Reference, &tx.MerchantID, &tx.CustomerEmail, &tx.CustomerID, &tx.CustomerName,
+			&tx.Amount, &tx.Currency, &tx.Status, &tx.PaymentMethod, &tx.Description,
+			&tx.CreatedAt, &tx.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		list = append(list, &tx)
+	}
+	return list, rows.Err()
+}
+
+func (r *TransactionRepository) ListByStatus(ctx context.Context, status string, limit int) ([]*models.Transaction, error) {
+	query := `
+		SELECT id, reference, merchant_id, customer_email, customer_id, customer_name, amount, currency, status, payment_method, description, created_at, updated_at
+		FROM transactions
+		WHERE status = $1
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
+	rows, err := r.db.QueryContext(ctx, query, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*models.Transaction
+	for rows.Next() {
+		var tx models.Transaction
+		if err := rows.Scan(
+			&tx.ID, &tx.Reference, &tx.MerchantID, &tx.CustomerEmail, &tx.CustomerID, &tx.CustomerName,
 			&tx.Amount, &tx.Currency, &tx.Status, &tx.PaymentMethod, &tx.Description,
 			&tx.CreatedAt, &tx.UpdatedAt,
 		); err != nil {
