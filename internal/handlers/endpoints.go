@@ -86,3 +86,21 @@ func (h *TransactionHandler) Refund(c *fiber.Ctx) error {
 	}
 	return c.JSON(h.svc.Refund(c.Context(), ref))
 }
+
+// UpdateStatus allows admin/fraud to update a transaction status
+func (h *TransactionHandler) UpdateStatus(c *fiber.Ctx) error {
+	ref := c.Params("reference")
+	if ref == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "reference is required")
+	}
+	var payload struct {
+		Status string `json:"status"`
+	}
+	if err := c.BodyParser(&payload); err != nil || payload.Status == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "status is required")
+	}
+	if err := h.svc.UpdateStatus(c.Context(), ref, payload.Status); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+	return c.SendStatus(fiber.StatusNoContent)
+}

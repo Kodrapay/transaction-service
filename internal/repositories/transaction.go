@@ -145,3 +145,13 @@ func (r *TransactionRepository) ListByStatus(ctx context.Context, status string,
 	}
 	return list, rows.Err()
 }
+
+// UpdateStatusByReference updates the status of a transaction by reference.
+func (r *TransactionRepository) UpdateStatusByReference(ctx context.Context, reference, status string) error {
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE transactions
+		SET status = $2, updated_at = NOW()
+		WHERE reference = $1
+	`, reference, status)
+	return err
+}

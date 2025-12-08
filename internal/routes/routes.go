@@ -31,4 +31,5 @@ func Register(app *fiber.App, serviceName string) {
 	app.Get("/transactions/:reference", handler.Get)
 	app.Post("/transactions/:reference/capture", handler.Capture)
 	app.Post("/transactions/:reference/refund", handler.Refund)
+	app.Put("/transactions/:reference/status", handler.UpdateStatus)
 }

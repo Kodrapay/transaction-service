@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/kodra-pay/transaction-service/internal/dto"
@@ -222,4 +223,14 @@ func (s *TransactionService) ListByStatus(ctx context.Context, status string, li
 		})
 	}
 	return res, nil
+}
+
+func (s *TransactionService) UpdateStatus(ctx context.Context, reference, status string) error {
+	statusLower := strings.ToLower(status)
+	switch statusLower {
+	case "success", "successful", "pending", "pending_review", "failed", "payout":
+	default:
+		return fmt.Errorf("invalid status")
+	}
+	return s.repo.UpdateStatusByReference(ctx, reference, statusLower)
 }
