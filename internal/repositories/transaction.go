@@ -42,27 +42,29 @@ func (r *TransactionRepository) Create(ctx context.Context, tx *models.Transacti
 		return err
 	}
 
-	// Record ledger credit for this merchant to feed settlement calculations.
-	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO wallet_ledger (
-			merchant_id, transaction_id, entry_type, amount, balance_after,
-			currency, description, reference, created_at
-		)
-		VALUES (
-			$1,
-			$2,
-			'credit',
-			$3,
-			(SELECT COALESCE(MAX(balance_after), 0) + $3 FROM wallet_ledger WHERE merchant_id = $1),
-			$4,
-			$5,
-			$6,
-			NOW()
-		)
-	`, tx.MerchantID, tx.ID, tx.Amount, tx.Currency, "Transaction credit", tx.Reference)
-	if err != nil {
-		// Log the error but don't fail the transaction creation
-		fmt.Printf("failed to record ledger entry: %v\n", err)
+	// Record ledger credit for this merchant to feed settlement calculations, skip payout rows.
+	if tx.Status != "payout" && tx.PaymentMethod != "payout" {
+		_, err := r.db.ExecContext(ctx, `
+			INSERT INTO wallet_ledger (
+				merchant_id, transaction_id, entry_type, amount, balance_after,
+				currency, description, reference, created_at
+			)
+			VALUES (
+				$1,
+				$2,
+				'credit',
+				$3,
+				(SELECT COALESCE(MAX(balance_after), 0) + $3 FROM wallet_ledger WHERE merchant_id = $1),
+				$4,
+				$5,
+				$6,
+				NOW()
+			)
+		`, tx.MerchantID, tx.ID, tx.Amount, tx.Currency, "Transaction credit", tx.Reference)
+		if err != nil {
+			// Log the error but don't fail the transaction creation
+			fmt.Printf("failed to record ledger entry: %v\n", err)
+		}
 	}
 
 	return nil

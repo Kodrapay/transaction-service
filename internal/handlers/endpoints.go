@@ -22,7 +22,7 @@ func (h *TransactionHandler) Create(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 	}
-	if req.MerchantID == 0 || req.Amount <= 0 { // int check
+	if req.MerchantID == 0 || req.Amount <= 0 {
 		return fiber.NewError(fiber.StatusBadRequest, "merchant_id and positive amount are required")
 	}
 

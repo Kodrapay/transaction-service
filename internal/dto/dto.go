@@ -9,7 +9,7 @@ type TransactionCreateRequest struct {
 	CustomerEmail string `json:"customer_email,omitempty"`
 	CustomerID    int `json:"customer_id"`
 	CustomerName  string `json:"customer_name,omitempty"`
-	Amount        int64  `json:"amount"`
+	Amount        float64  `json:"amount"` // currency units (e.g., NGN)
 	Currency      string `json:"currency"`
 	PaymentMethod string `json:"payment_method,omitempty"`
 	Description   string `json:"description,omitempty"`
@@ -24,7 +24,7 @@ type TransactionResponse struct {
 	CustomerEmail string    `json:"customer_email"`
 	CustomerID    int       `json:"customer_id"`
 	CustomerName  string    `json:"customer_name,omitempty"`
-	Amount        int64     `json:"amount"`
+	Amount        float64     `json:"amount"` // currency units (e.g., NGN)
 	Currency      string    `json:"currency"`
 	Status        string    `json:"status"`
 	Description   string    `json:"description,omitempty"`

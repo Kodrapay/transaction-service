@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"time"
-	"io"
 
 	"github.com/kodra-pay/transaction-service/internal/dto"
 	"github.com/kodra-pay/transaction-service/internal/models"
@@ -31,7 +32,7 @@ func NewTransactionService(repo *repositories.TransactionRepository, publisher *
 
 func (s *TransactionService) Create(ctx context.Context, req dto.TransactionCreateRequest) (dto.TransactionResponse, error) {
 	ref := req.Reference // is now string
-	if ref == "" { // Check for empty string instead of 0
+	if ref == "" {       // Check for empty string instead of 0
 		// In a real scenario, an int reference would be generated, perhaps from a sequence or tx.ID after creation.
 		// For now, we'll rely on it being provided or handled by the DB.
 		// For string references, you might want to generate a UUID here if not provided.
@@ -45,15 +46,22 @@ func (s *TransactionService) Create(ctx context.Context, req dto.TransactionCrea
 		paymentMethod = "card"
 	}
 
+	status := req.Status
+	if status == "" {
+		status = "success"
+	}
+
+	amountKobo := int64(math.Round(req.Amount * 100))
+
 	tx := &models.Transaction{
 		Reference:     ref, // string
 		MerchantID:    req.MerchantID,
 		CustomerEmail: email,
 		CustomerID:    req.CustomerID,
 		CustomerName:  req.CustomerName,
-		Amount:        req.Amount,
+		Amount:        amountKobo,
 		Currency:      req.Currency,
-		Status:        "success",
+		Status:        status,
 		PaymentMethod: paymentMethod,
 		Description:   req.Description,
 	}
@@ -62,11 +70,14 @@ func (s *TransactionService) Create(ctx context.Context, req dto.TransactionCrea
 		return dto.TransactionResponse{}, err
 	}
 
-	// Update merchant balance asynchronously
-	go s.updateMerchantBalance(tx.MerchantID, tx.Currency, tx.Amount)
+	// Update merchant balance asynchronously for revenue-generating transactions only
+	if tx.Status != "payout" && tx.PaymentMethod != "payout" {
+		amountCurrency := float64(tx.Amount) / 100
+		go s.updateMerchantBalance(tx.MerchantID, tx.Currency, amountCurrency)
+	}
 
 	// Publish settlement event to Redis queue
-	if s.settlementPublisher != nil {
+	if s.settlementPublisher != nil && tx.Status != "payout" && tx.PaymentMethod != "payout" {
 		go func() {
 			publishCtx := context.Background()
 			// tx.Reference is now string, need to convert tx.ID to string if settlementPublisher expects string reference
@@ -84,7 +95,7 @@ func (s *TransactionService) Create(ctx context.Context, req dto.TransactionCrea
 		CustomerEmail: tx.CustomerEmail,
 		CustomerID:    tx.CustomerID,
 		CustomerName:  tx.CustomerName,
-		Amount:        tx.Amount,
+		Amount:        float64(tx.Amount) / 100,
 		Currency:      tx.Currency,
 		Status:        tx.Status,
 		Description:   tx.Description,
@@ -93,7 +104,7 @@ func (s *TransactionService) Create(ctx context.Context, req dto.TransactionCrea
 }
 
 // updateMerchantBalance calls the merchant service to update the balance
-func (s *TransactionService) updateMerchantBalance(merchantID int, currency string, amount int64) {
+func (s *TransactionService) updateMerchantBalance(merchantID int, currency string, amount float64) {
 	merchantServiceURL := os.Getenv("MERCHANT_SERVICE_URL")
 	if merchantServiceURL == "" {
 		merchantServiceURL = "http://merchant-service:7002"
@@ -147,7 +158,7 @@ func (s *TransactionService) Get(ctx context.Context, reference string) (dto.Tra
 		CustomerEmail: tx.CustomerEmail,
 		CustomerID:    tx.CustomerID,
 		CustomerName:  tx.CustomerName,
-		Amount:        tx.Amount,
+		Amount:        float64(tx.Amount) / 100.0,
 		Currency:      tx.Currency,
 		Status:        tx.Status,
 		Description:   tx.Description,
@@ -179,7 +190,7 @@ func (s *TransactionService) ListByMerchant(ctx context.Context, merchantID int,
 			CustomerEmail: tx.CustomerEmail,
 			CustomerID:    tx.CustomerID,
 			CustomerName:  tx.CustomerName,
-			Amount:        tx.Amount,
+			Amount:        float64(tx.Amount) / 100,
 			Currency:      tx.Currency,
 			Status:        tx.Status,
 			Description:   tx.Description,
@@ -203,7 +214,7 @@ func (s *TransactionService) ListByStatus(ctx context.Context, status string, li
 			CustomerEmail: tx.CustomerEmail,
 			CustomerID:    tx.CustomerID,
 			CustomerName:  tx.CustomerName,
-			Amount:        tx.Amount,
+			Amount:        float64(tx.Amount) / 100,
 			Currency:      tx.Currency,
 			Status:        tx.Status,
 			Description:   tx.Description,
